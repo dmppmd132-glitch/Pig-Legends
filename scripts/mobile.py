@@ -86,7 +86,7 @@ def main() -> None:
               const q = (s) => document.querySelector(s);
               const box = (s) => { const e = q(s); if (!e) return null; const r = e.getBoundingClientRect(); return {x: r.x, y: r.y, w: r.width, h: r.height}; };
               const acts = [...document.querySelectorAll('.act')].map((b) => ({
-                label: b.textContent.trim(),
+                label: [...b.classList].filter((c) => c !== 'act' && c !== 'press' && c !== 'cool' && c !== 'on').join('.'),
                 box: (() => { const r = b.getBoundingClientRect(); return {x: r.x + r.width/2, y: r.y + r.height/2}; })(),
               }));
               return {
@@ -129,8 +129,12 @@ def main() -> None:
             result["movedMetres"] = round(moved, 2)
             result["stateWhileHeld"] = during["state"]
 
-        attack = next((a for a in layout["acts"] if "attack" in a["label"].lower() or a["label"] in ("⚔", "SLASH")), None)
-        roll = next((a for a in layout["acts"] if "roll" in a["label"].lower() or "dodge" in a["label"].lower()), None)
+        # Buttons are drawn as glyphs, so their text is empty; the class the
+        # component adds (`atk`, `dodge`, `lock`, `run`) is the stable handle.
+        by_area = {a["label"]: a for a in layout["acts"]}
+        attack = by_area.get("atk")
+        roll = by_area.get("dodge")
+
         if attack:
             st0 = page.evaluate(SNAP)
             page.mouse.click(attack["box"]["x"], attack["box"]["y"])
@@ -150,7 +154,7 @@ def main() -> None:
                 "staminaDelta": round(st1["stamina"] - st0["stamina"], 1),
             }
 
-        lock = next((a for a in layout["acts"] if "lock" in a["label"].lower()), None)
+        lock = by_area.get("lock")
         if lock:
             page.mouse.click(lock["box"]["x"], lock["box"]["y"])
             time.sleep(3)

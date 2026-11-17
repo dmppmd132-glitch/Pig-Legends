@@ -13,7 +13,7 @@ const DISMISS_KEY = 'pig-legends:install-dismissed';
  * fires, so that platform gets the manual Share → Add to Home Screen note;
  * there is no API to shortcut it.
  */
-export function InstallPrompt() {
+export function InstallPrompt({ playing = false }: { playing?: boolean }) {
   const { canInstall, installed, promptInstall } = usePwaInstall();
   const { updateReady, offlineReady, applyUpdate, dismissUpdate } = useOfflineReady();
   const [dismissed, setDismissed] = useState(() => {
@@ -35,7 +35,11 @@ export function InstallPrompt() {
 
   if (updateReady || offlineReady) {
     return (
-      <div className="install-dock" role="status">
+      // Mid-run the notice has to clear the touch layer. The dock is centred on
+      // the bottom edge — exactly where the virtual stick and the action
+      // buttons live — and at z-index 6 it swallowed every pointer aimed at
+      // them, which elementFromPoint on a 390x844 viewport confirmed.
+      <div className={`install-dock${playing ? ' above-hud' : ''}`} role="status">
         <p>A new hunt is ready to load.</p>
         <button type="button" className="btn small" onClick={applyUpdate}>
           Update now
@@ -48,6 +52,9 @@ export function InstallPrompt() {
   }
 
   if (installed || dismissed || (!canInstall && !iosNeedsHint)) return null;
+  // Never nag on top of the controls. The title card carries its own Install
+  // button, so the offer stays where it is safe to tap.
+  if (playing) return null;
 
   const close = () => {
     setDismissed(true);

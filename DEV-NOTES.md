@@ -64,3 +64,49 @@ GitHub：`dmppmd132-glitch/Pig-Legends`（既有 repo）。Pages：`https://dmpp
 - [ ] `.github/workflows/deploy.yml`（GitHub 官方 Pages Actions）、README.md、.gitignore
 - [ ] GitHub OAuth 連接 → push main → Pages Source = GitHub Actions
 - [ ] 驗證正式 Pages URL 與離線安裝
+
+## 無頭瀏覽器實測紀錄（scripts/probe.py, combat.py, mobile.py, acts.py）
+
+| 項目 | 結果 |
+| --- | --- |
+| console / pageerror | 0 |
+| 鍵盤移動 | Shift+W → 實際位移 5.06 m，idle→run |
+| 狼 AI | alert → stalk → recover → stagger → dead（被擊 16/15/33/16，33 為連擊終式） |
+| 擊殺 | wolf hp 0、state dead、kills 1，無錯誤 |
+| 耐力消耗 | 連續揮劍 100 → 94 → 89 |
+| 鎖定 | Q 鍵與 LOCK 按鈕皆 locked=true |
+| 手機搖桿 | knob 位移 -35 px，角色走 46.0 m，state walk |
+| 手機按鈕 | atk→state attack、dodge→state dodge、lock→locked true |
+| Bundle | babylon 2.11 MB / gzip 485 KB，precache 28 檔 2.76 MB |
+
+## 這輪抓到的 bug 與修法
+
+1. **快速按鍵整段消失**：邊界偵測只在取樣瞬間看 `down && !prev`，同一幀內的
+   down+up 完全看不到（370 次敲擊 0 命中）。加入 `PLAYER.inputBufferMs = 220`
+   的時間戳緩衝，鍵盤/滑鼠/觸控共用同一套消費順序。
+2. **Esc 無法解除暫停**：讀 `input.pause` 的程式碼在 tick 的暫停分支 return
+   之後。改為暫停與選單分支也輪詢輸入。
+3. **PWA 安裝橫幅蓋住搖桿**：`.install-dock` 為 `z-index: 6`、底部置中，
+   `elementFromPoint` 在 390x844 搖桿圓心取得的竟是 dock 本身 — 真手機上
+   搖桿會整個失靈。遊玩中不再顯示安裝提示，更新提示改置於頂部。
+4. **`Ray` 副作用未匯入**：`camera.getForwardRay()`（飄字前後剔除）在
+   `camera.pure.js` 只是丟 `_WarnImport("Ray")` 的佔位。補
+   `import '@babylonjs/core/Culling/ray.js'`。
+5. **`virtual:pwa-register` 用變數動態匯入**：Vite 無法解析，瀏覽器把它當成
+   相對 URL → CORS 錯誤。改用 `virtual:pwa-register/react` 的靜態匯入。
+6. **IndexedDB upgrade 內呼叫 `db.put`**：拋 "A version change transaction is
+   running."。改用版本交易自身的 `tx.objectStore(...).put(...)`。
+7. **`vite preview` 不適合驗證 Pages**：它把 `/src/index.html` 當入口且会擋
+   轉傳網域；改用 `scripts/serve-dist.py` 以 `/Pig-Legends/` 前綴加 no-store
+   提供 dist，才重現了真實路徑行為。
+
+## GitHub Pages 部署狀態
+
+- push 觸發 workflow：`npm ci`、`npm run typecheck`、`npm run build` 在 CI 全過。
+- 卡點：`actions/configure-pages@v5` 無法建立 Pages 站台，
+  `Create Pages site failed. Resource not accessible by integration`。
+  原因為 repo 的 `default_workflow_permissions = read`
+  （Settings → Actions → General → Workflow permissions），
+  所以 workflow 檔內的 `permissions: pages: write` 被壓掉。
+  該設定需要 repo admin 在網頁上改為 "Read and write permissions"，
+  OAuth token 也缺少 `pages` scope，無法由 API 代跑。

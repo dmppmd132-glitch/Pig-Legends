@@ -258,7 +258,7 @@ export default function App() {
         />
       )}
 
-      <InstallPrompt />
+      <InstallPrompt playing={phase === 'playing'} />
 
       <div className="perf" aria-hidden="true">
         v{GAME_VERSION} · {WORLD.name} · {QUALITY[hud.quality].label}

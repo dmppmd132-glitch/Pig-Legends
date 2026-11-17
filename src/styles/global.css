@@ -788,6 +788,12 @@ kbd {
   max-width: calc(100vw - 20px);
 }
 
+/* Used while a run is in progress: keeps the notice clear of the stick. */
+.install-dock.above-hud {
+  bottom: auto;
+  top: calc(10px + var(--hud-pad-t));
+}
+
 .install-dock p {
   margin: 0;
   font: 500 11px/1.4 var(--font-ui);
