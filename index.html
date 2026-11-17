@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Pig Legends — ARNO of the Darkwood</title>
+    <meta
+      name="description"
+      content="A dark-fantasy action RPG you can install as an app. Play ARNO, the last pig knight, through the Dimwood: sword, dodge, and hunt the forest wolves."
+    />
+
+    <meta name="theme-color" content="#0f1512" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Pig Legends" />
+    <meta name="application-name" content="Pig Legends" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- Public assets: Vite prefixes these with `base` at build time, so they
+         resolve to /Pig-Legends/... on GitHub Pages instead of the host root.
+         The manifest link is deliberately absent: vite-plugin-pwa injects a
+         correctly based one, and a hand-written duplicate here resolved to
+         the host root and made installs fail. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="alternate icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://dmppmd132-glitch.github.io/Pig-Legends/" />
+    <meta property="og:title" content="Pig Legends — ARNO of the Darkwood" />
+    <meta
+      property="og:description"
+      content="Installable dark-fantasy action RPG built with Babylon.js. Sword, dodge and hunt in the Dimwood."
+    />
+    <!-- Social crawlers only accept absolute image URLs, so this one is written
+         out in full rather than relying on Vite's base rewriting. -->
+    <meta
+      property="og:image"
+      content="https://dmppmd132-glitch.github.io/Pig-Legends/icons/icon-512.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <style>
+      /* Boot shell is inline so the first paint is correct before CSS chunks
+         load, and so a WebGL failure still shows a readable page. */
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        background: #0a0d0b;
+        color: #d8d2c4;
+        font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        overflow: hidden;
+        overscroll-behavior: none;
+        touch-action: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #root {
+        position: fixed;
+        inset: 0;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        gap: 18px;
+        justify-items: center;
+        background: radial-gradient(120% 90% at 50% 10%, #16201b 0%, #0a0d0b 70%);
+        transition: opacity 0.6s ease;
+      }
+      #boot[data-done='1'] {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #boot h1 {
+        margin: 0;
+        font-size: clamp(20px, 5vw, 34px);
+        letter-spacing: 0.42em;
+        text-transform: uppercase;
+        font-weight: 600;
+        color: #b9ac8c;
+        text-shadow: 0 0 26px rgba(120, 170, 130, 0.22);
+      }
+      #boot .bar {
+        width: min(46vw, 260px);
+        height: 2px;
+        background: rgba(255, 255, 255, 0.09);
+        overflow: hidden;
+      }
+      #boot .bar i {
+        display: block;
+        height: 100%;
+        width: 35%;
+        background: linear-gradient(90deg, transparent, #7ea37a, transparent);
+        animation: bootslide 1.25s ease-in-out infinite;
+      }
+      #boot small {
+        color: #6d7a6f;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        font-size: 10px;
+      }
+      @keyframes bootslide {
+        0% {
+          transform: translateX(-110%);
+        }
+        100% {
+          transform: translateX(320%);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="boot">
+      <h1>Pig Legends</h1>
+      <div class="bar"><i></i></div>
+      <small>Entering the Dimwood…</small>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

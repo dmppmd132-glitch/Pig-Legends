@@ -1,0 +1,66 @@
+name: Deploy Pig Legends to GitHub Pages
+
+# Built on every push to main, and on demand from the Actions tab.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# `pages: write` + `id-token: write` are what let the official deployment
+# action flip Pages over to this workflow without any manual repository setup.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A newer commit supersedes an in-flight deploy; there is nothing to preserve.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` instead of `npm install`: the lockfile is committed, so a
+      # deploy must resolve to exactly the audited dependency tree or fail.
+      - name: Install dependencies
+        run: npm ci
+
+      # The build script already runs tsc, but keeping the step separate makes
+      # it obvious which half of a failure was types and which was bundling.
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      # Everything in dist/ — hashed assets, the service worker,
+      # manifest.webmanifest, icons and .nojekyll — is uploaded as one artifact.
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

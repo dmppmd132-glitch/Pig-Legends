@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output — GitHub Pages is fed by Actions, so dist is never committed.
+dist/
+dev-dist/
+
+# Local caches and editor noise
+.vite/
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Test harness scratch space
+/tmp/
+shots/
+screenshots/
+*.log
+
+# Secrets never belong in this repository
+.env
+.env.*
+!.env.example
