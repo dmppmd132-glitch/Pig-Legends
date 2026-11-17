@@ -46,6 +46,14 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+        with:
+          # Without this the action only *reads* an existing Pages site, and a
+          # repository that has never had Pages switched on fails the first
+          # deploy with "Get Pages site failed … Not Found". `enablement: true`
+          # lets the workflow create the site with GitHub Actions as its
+          # source, using the `pages: write` permission granted above — so
+          # pushing to main is genuinely all a first-time deploy needs.
+          enablement: true
 
       # Everything in dist/ — hashed assets, the service worker,
       # manifest.webmanifest, icons and .nojekyll — is uploaded as one artifact.
