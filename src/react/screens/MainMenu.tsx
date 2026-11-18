@@ -56,10 +56,16 @@ export function MainMenu({ profile, onPlay, onSettings }: Props) {
             <kbd>J</kbd> / <kbd>Click</kbd> Slash (×3 chain)
           </div>
           <div>
-            <kbd>Space</kbd> Roll
-          </div>
-          <div>
-            <kbd>Q</kbd> Lock on
+          <kbd>Space</kbd> Roll
+        </div>
+        <div>
+          <kbd>L</kbd> / <kbd>C</kbd> Jump · evade a pounce
+        </div>
+        <div>
+          <kbd>F</kbd> Runic Burst · area attack (stamina / cooldown)
+        </div>
+        <div>
+          <kbd>Q</kbd> Lock on
           </div>
           <div>
             <kbd>Esc</kbd> Pause

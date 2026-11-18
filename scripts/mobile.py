@@ -6,7 +6,7 @@ A virtual stick is easy to draw and easy to get wrong: pointer capture,
 nothing happens in the world. This loads the built game as a phone, checks the
 stick and buttons exist, then pushes the stick with a real pointer and measures
 how far ARNO went, then taps ATTACK and ROLL and reads the consequences back
-out of the engine through the `?debug=1` hook.
+out of the engine through the `?debug=1` hook. Jump and Rune Skill are also sampled.
 
     python3 scripts/mobile.py --url "http://localhost:4174/Pig-Legends/?mode=hunt&debug=1"
 """
@@ -22,8 +22,10 @@ from playwright.sync_api import sync_playwright
 SNAP = """() => {
   const v = window.pigDebug.debugView;
   return {
-    x: v.player.x, z: v.player.z, state: v.player.state,
+    x: v.player.x, y: v.player.y, z: v.player.z, state: v.player.state,
     hp: v.player.hp, stamina: v.player.stamina,
+    airborne: v.player.airborne, jumpReady: v.player.jumpReady,
+    skillReady: v.player.skillReady, skillCooldown: v.player.skillCooldown,
     wolves: v.wolves, locked: v.locked, kills: v.run.kills,
   };
 }"""
@@ -129,9 +131,49 @@ def main() -> None:
             result["movedMetres"] = round(moved, 2)
             result["stateWhileHeld"] = during["state"]
 
-        # Buttons are drawn as glyphs, so their text is empty; the class the
-        # component adds (`atk`, `dodge`, `lock`, `run`) is the stable handle.
+        # Buttons are drawn as glyphs, so the action class is the stable handle.
         by_area = {a["label"]: a for a in layout["acts"]}
+        jump = by_area.get("jump")
+        skill = by_area.get("skill")
+
+        if jump:
+            before = page.evaluate(SNAP)
+            page.mouse.click(jump["box"]["x"], jump["box"]["y"])
+            highest_y = before["y"]
+            airborne_seen = False
+            deadline = time.time() + 2.5
+            landed = before
+            while time.time() < deadline:
+                landed = page.evaluate(SNAP)
+                highest_y = max(highest_y, landed["y"])
+                airborne_seen = airborne_seen or landed["airborne"]
+                if airborne_seen and landed["jumpReady"]:
+                    break
+                time.sleep(0.055)
+            landed = page.evaluate(SNAP)
+            result["jumpTap"] = {
+                "heightGainMetres": round(highest_y - before["y"], 2),
+                "airborneSeen": airborne_seen,
+                "readyAfterLanding": landed["jumpReady"],
+            }
+
+        if skill:
+            # Give the jump its short landing window before testing the next
+            # action; the skill remains available in mid-air too.
+            deadline = time.time() + 1.2
+            while time.time() < deadline and not page.evaluate(SNAP)["jumpReady"]:
+                time.sleep(0.04)
+            before = page.evaluate(SNAP)
+            page.mouse.click(skill["box"]["x"], skill["box"]["y"])
+            time.sleep(0.25)
+            after = page.evaluate(SNAP)
+            result["skillTap"] = {
+                "readyBefore": before["skillReady"],
+                "cooldownStarted": after["skillCooldown"] > 0,
+                "cooldownSeconds": after["skillCooldown"],
+                "staminaSpent": round(before["stamina"] - after["stamina"], 1),
+            }
+
         attack = by_area.get("atk")
         roll = by_area.get("dodge")
 

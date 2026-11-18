@@ -25,7 +25,7 @@ FAST = """() => {
   return true;
 }"""
 
-STATE = "() => { const v = window.pigDebug.debugView; return {state: v.player.state, stamina: v.player.stamina, hp: v.player.hp, locked: v.locked, wolfHp: v.wolves[0] ? v.wolves[0].hp : null, kills: v.run.kills}; }"
+STATE = "() => { const v = window.pigDebug.debugView; return {state: v.player.state, stamina: v.player.stamina, hp: v.player.hp, y: v.player.y, airborne: v.player.airborne, jumpReady: v.player.jumpReady, skillReady: v.player.skillReady, skillCooldown: v.player.skillCooldown, locked: v.locked, wolfHp: v.wolves[0] ? v.wolves[0].hp : null, kills: v.run.kills}; }"
 
 
 def main() -> None:
@@ -92,6 +92,34 @@ def main() -> None:
                 "after": after,
                 "minStamina": min(s for s in [before["stamina"], after["stamina"]]),
             }
+
+        # Confirm Jump lifts ARNO off the floor, then Rune Skill starts its
+        # cooldown and spends stamina even when the exact burst frame is short.
+        before_jump = page.evaluate(STATE)
+        page.mouse.click(boxes["jump"]["x"], boxes["jump"]["y"])
+        highest_y = before_jump["y"]
+        airborne_seen = False
+        for _ in range(18):
+            time.sleep(0.06)
+            sample = page.evaluate(STATE)
+            highest_y = max(highest_y, sample["y"])
+            airborne_seen = airborne_seen or sample["airborne"]
+        report["jump"] = {
+            "heightGain": round(highest_y - before_jump["y"], 2),
+            "airborneSeen": airborne_seen,
+            "readyAgain": page.evaluate(STATE)["jumpReady"],
+        }
+        time.sleep(0.8)
+        before_skill = page.evaluate(STATE)
+        page.mouse.click(boxes["skill"]["x"], boxes["skill"]["y"])
+        time.sleep(0.25)
+        after_skill = page.evaluate(STATE)
+        report["skill"] = {
+            "readyBefore": before_skill["skillReady"],
+            "cooldownStarted": after_skill["skillCooldown"] > 0,
+            "cooldownSeconds": after_skill["skillCooldown"],
+            "staminaSpent": round(before_skill["stamina"] - after_skill["stamina"], 1),
+        }
 
         report["attack_x3"] = tap_and_watch("atk", taps=3)
         time.sleep(2.5)

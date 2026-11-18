@@ -30,6 +30,9 @@ export interface HudState {
   toastId: number;
 
   dodgeReady: boolean;
+  jumpReady: boolean;
+  skillReady: boolean;
+  skillCooldown: number;
   staminaLocked: boolean;
 
   fps: number;
@@ -67,6 +70,9 @@ export const initialHud: HudState = {
   toastId: 0,
 
   dodgeReady: true,
+  jumpReady: true,
+  skillReady: true,
+  skillCooldown: 0,
   staminaLocked: false,
 
   fps: 0,

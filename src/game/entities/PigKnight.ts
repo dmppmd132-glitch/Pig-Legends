@@ -76,6 +76,9 @@ export class PigKnight {
   private dodgeTime = 0;
   private dodgeCooldown = 0;
   private dodgeDir = new Vector3(0, 0, 1);
+  private jumpHeight = 0;
+  private jumpVelocity = 0;
+  private skillCooldown = 0;
   private hurtTime = 0;
   private invulnTime = 0;
   private deadTime = 0;
@@ -118,6 +121,23 @@ export class PigKnight {
     );
   }
 
+  get jumpReady(): boolean {
+    return this.jumpHeight <= 0.02 && this.state !== 'dodge' && this.state !== 'hurt' && this.state !== 'dead';
+  }
+
+  get skillReady(): boolean {
+    return this.skillCooldown <= 0 && this.stamina >= PLAYER.skillStaminaCost &&
+      this.state !== 'dodge' && this.state !== 'hurt' && this.state !== 'dead';
+  }
+
+  get skillCooldownRemaining(): number {
+    return this.skillCooldown;
+  }
+
+  get airborne(): boolean {
+    return this.jumpHeight >= PLAYER.jumpEvadeHeight;
+  }
+
   get facing(): Vector3 {
     return new Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
   }
@@ -151,6 +171,19 @@ export class PigKnight {
     this.state = 'attack';
     this.stamina = Math.max(0, this.stamina - PLAYER.staminaAttackCost);
     this.onSwing?.(this.comboStep);
+    return true;
+  }
+
+  tryJump(): boolean {
+    if (!this.jumpReady) return false;
+    this.jumpVelocity = PLAYER.jumpSpeed;
+    return true;
+  }
+
+  trySkill(): boolean {
+    if (!this.skillReady) return false;
+    this.stamina = Math.max(0, this.stamina - PLAYER.skillStaminaCost);
+    this.skillCooldown = PLAYER.skillCooldown;
     return true;
   }
 
@@ -210,6 +243,9 @@ export class PigKnight {
     this.attackTime = 0;
     this.dodgeTime = 0;
     this.dodgeCooldown = 0;
+    this.jumpHeight = 0;
+    this.jumpVelocity = 0;
+    this.skillCooldown = 0;
     this.hurtTime = 0;
     this.invulnTime = 1.1;
     this.deadTime = 0;
@@ -238,6 +274,7 @@ export class PigKnight {
     this.time += dt;
     this.invulnTime = Math.max(0, this.invulnTime - dt);
     this.dodgeCooldown = Math.max(0, this.dodgeCooldown - dt);
+    this.skillCooldown = Math.max(0, this.skillCooldown - dt);
     this.comboTime = Math.max(0, this.comboTime - dt);
     if (this.comboTime === 0) this.comboStep = -1;
 
@@ -341,6 +378,17 @@ export class PigKnight {
       this.stamina = Math.min(PLAYER.maxStamina, this.stamina + rate * dt);
     }
 
+    // Ballistic jump arc. The player remains in their current locomotion or
+    // combo state while airborne; only the root height and leg pose are layered.
+    if (this.jumpHeight > 0 || this.jumpVelocity > 0) {
+      this.jumpVelocity -= PLAYER.jumpGravity * dt;
+      this.jumpHeight += this.jumpVelocity * dt;
+      if (this.jumpHeight <= 0) {
+        this.jumpHeight = 0;
+        this.jumpVelocity = 0;
+      }
+    }
+
     // ---------------- knockback ----------------
     if (this.impulse.lengthSquared() > 1e-5) {
       this.position.x += this.impulse.x * dt;
@@ -351,7 +399,7 @@ export class PigKnight {
 
     // ---------------- collisions ----------------
     this.resolveCollisions(obstacles, arenaRadius);
-    this.position.y = terrainHeight(this.position.x, this.position.z);
+    this.position.y = terrainHeight(this.position.x, this.position.z) + this.jumpHeight;
 
     // ---------------- footfall events ----------------
     if (this.state === 'walk' || this.state === 'run') {
@@ -492,6 +540,17 @@ export class PigKnight {
       hipsY = breath * 0.4;
       shoulderLX = POSE.guardShoulder * 0.35 + sway * 0.3;
       shoulderRX = POSE.guardShoulder * 0.5 - sway * 0.3;
+    }
+
+    // --- airborne tuck; attack animation remains layered over the upper body ---
+    if (this.jumpHeight > 0.03) {
+      const lift = clamp01(this.jumpHeight / 0.9);
+      hipsY += 0.035 + lift * 0.045;
+      thighLX = lerp(thighLX, -0.48, lift);
+      thighRX = lerp(thighRX, 0.42, lift);
+      kneeLX = lerp(kneeLX, 0.72, lift);
+      kneeRX = lerp(kneeRX, 0.88, lift);
+      spinePitch -= 0.08 * lift;
     }
 
     // --- attack overlay: authored per combo step ---

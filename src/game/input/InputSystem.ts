@@ -2,10 +2,10 @@ import { Vector2 } from '../babylon';
 import { PLAYER } from '../config';
 import { clamp } from '../math';
 
-export type VirtualAction = 'attack' | 'dodge' | 'run' | 'lock' | 'pause';
+export type VirtualAction = 'attack' | 'dodge' | 'run' | 'lock' | 'pause' | 'jump' | 'skill';
 
 /** Actions that fire from a single press instead of from being held. */
-type TapAction = 'attack' | 'dodge' | 'lock' | 'pause' | 'restart';
+type TapAction = 'attack' | 'dodge' | 'lock' | 'pause' | 'restart' | 'jump' | 'skill';
 
 /** One frame's worth of resolved intent, in a device-independent shape. */
 export interface InputFrame {
@@ -15,6 +15,8 @@ export interface InputFrame {
   /** True only on the frame the button went down. */
   attack: boolean;
   dodge: boolean;
+  jump: boolean;
+  skill: boolean;
   lock: boolean;
   pause: boolean;
   restart: boolean;
@@ -40,6 +42,9 @@ const KEY_MAP: Record<string, keyof Bindings | undefined> = {
   Space: 'dodge',
   KeyK: 'dodge',
   KeyX: 'dodge',
+  KeyL: 'jump',
+  KeyC: 'jump',
+  KeyF: 'skill',
   KeyQ: 'lock',
   Tab: 'lock',
   Escape: 'pause',
@@ -55,13 +60,15 @@ interface Bindings {
   run: boolean;
   attack: boolean;
   dodge: boolean;
+  jump: boolean;
+  skill: boolean;
   lock: boolean;
   pause: boolean;
   restart: boolean;
 }
 
 /** Which bound actions are press-driven; these fill the input buffer. */
-const TAP_ACTIONS = new Set<string>(['attack', 'dodge', 'lock', 'pause', 'restart']);
+const TAP_ACTIONS = new Set<string>(['attack', 'dodge', 'lock', 'pause', 'restart', 'jump', 'skill']);
 
 const emptyBindings = (): Bindings => ({
   forward: false,
@@ -71,6 +78,8 @@ const emptyBindings = (): Bindings => ({
   run: false,
   attack: false,
   dodge: false,
+  jump: false,
+  skill: false,
   lock: false,
   pause: false,
   restart: false,
@@ -86,6 +95,9 @@ const SWALLOW = new Set([
   'ArrowRight',
   'KeyJ',
   'KeyK',
+  'KeyL',
+  'KeyC',
+  'KeyF',
   'KeyQ',
   'KeyR',
   'Escape',
@@ -104,6 +116,8 @@ export class InputSystem {
     run: false,
     lock: false,
     pause: false,
+    jump: false,
+    skill: false,
   };
   private vWasPressed: Record<VirtualAction, boolean> = {
     attack: false,
@@ -111,6 +125,8 @@ export class InputSystem {
     run: false,
     lock: false,
     pause: false,
+    jump: false,
+    skill: false,
   };
 
   /**
@@ -147,6 +163,8 @@ export class InputSystem {
     run: false,
     attack: false,
     dodge: false,
+    jump: false,
+    skill: false,
     lock: false,
     pause: false,
     restart: false,
@@ -285,11 +303,11 @@ export class InputSystem {
 
   /** Held buttons from the touch layer; `run` is a toggle, not an edge. */
   setVirtualHold(action: VirtualAction, down: boolean): void {
-    if (action === 'attack' || action === 'dodge' || action === 'lock' || action === 'pause') {
-      // Tap: latch until the next poll consumes it.
-      if (down) this.vPressed[action] = true;
-    } else {
+    if (action === 'run') {
       this.vRun = down;
+    } else if (down) {
+      // Actions latch until the next poll, including the one-shot jump/skill taps.
+      this.vPressed[action] = true;
     }
   }
 
@@ -350,6 +368,8 @@ export class InputSystem {
       this.take('dodge', now) ||
       this.firedEdge('dodge', this.secondaryDown) ||
       (pad?.dodge ?? false);
+    f.jump = this.consumeTap('jump') || this.take('jump', now) || this.firedEdge('jump') || (pad?.jump ?? false);
+    f.skill = this.consumeTap('skill') || this.take('skill', now) || this.firedEdge('skill') || (pad?.skill ?? false);
     f.lock =
       this.consumeTap('lock') || this.take('lock', now) || this.firedEdge('lock') || (pad?.lock ?? false);
     f.pause = this.consumeTap('pause') || this.take('pause', now) || this.firedEdge('pause');
@@ -404,7 +424,18 @@ export class InputSystem {
   }
 
   private pollGamepad():
-    | { x: number; y: number; run: boolean; attack: boolean; dodge: boolean; lock: boolean; lookX: number; lookY: number }
+    | {
+        x: number;
+        y: number;
+        run: boolean;
+        attack: boolean;
+        dodge: boolean;
+        jump: boolean;
+        skill: boolean;
+        lock: boolean;
+        lookX: number;
+        lookY: number;
+      }
     | null {
     if (typeof navigator === 'undefined' || !('getGamepads' in navigator)) return null;
     let gp: Gamepad | null = null;
@@ -436,6 +467,8 @@ export class InputSystem {
       run: (gp.buttons[7]?.value ?? 0) > 0.4 || (gp.buttons[10]?.pressed ?? false),
       attack: gp.buttons[2]?.pressed ?? false,
       dodge: gp.buttons[1]?.pressed ?? false,
+      jump: gp.buttons[0]?.pressed ?? false,
+      skill: gp.buttons[3]?.pressed ?? false,
       lock: gp.buttons[15]?.pressed ?? false,
       lookX: dead(rx),
       lookY: dead(ry),
@@ -464,6 +497,8 @@ export class InputSystem {
     this.frame.look.set(0, 0);
     this.frame.attack = false;
     this.frame.dodge = false;
+    this.frame.jump = false;
+    this.frame.skill = false;
     this.frame.lock = false;
     this.frame.pause = false;
     this.frame.restart = false;

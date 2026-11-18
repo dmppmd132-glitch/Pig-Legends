@@ -26,7 +26,7 @@ import { Store } from './store';
 import { initialHud } from './types';
 import type { HudState, Settings } from './types';
 import { createCharacterMaterials, particleSprite, type CharacterMaterials } from './materials';
-import { InputSystem } from './input/InputSystem';
+import { InputSystem, type VirtualAction } from './input/InputSystem';
 import { PigKnight } from './entities/PigKnight';
 import { Wolf } from './entities/Wolf';
 import { CameraRig } from './systems/camera';
@@ -538,6 +538,9 @@ export class GameEngine {
       targetVisible: false,
       hp: PLAYER.maxHp,
       stamina: PLAYER.maxStamina,
+      jumpReady: true,
+      skillReady: true,
+      skillCooldown: 0,
     });
     this.setPhase('playing');
     this.audio.stopAmbience();
@@ -590,9 +593,8 @@ export class GameEngine {
   /** Touch layer feeds the same input system the keyboard uses. */
   readonly touch = {
     move: (x: number, y: number): void => this.input?.setVirtualMove(x, y),
-    hold: (action: 'attack' | 'dodge' | 'run' | 'lock' | 'pause', down: boolean): void =>
-      this.input?.setVirtualHold(action, down),
-    tap: (action: 'attack' | 'dodge' | 'run' | 'lock' | 'pause'): void => this.input?.tap(action),
+    hold: (action: VirtualAction, down: boolean): void => this.input?.setVirtualHold(action, down),
+    tap: (action: VirtualAction): void => this.input?.tap(action),
   };
 
   get isReady(): boolean {
@@ -612,7 +614,10 @@ export class GameEngine {
   get debugView(): {
     scene: Scene;
     camera: FreeCamera;
-    player: { x: number; y: number; z: number; hp: number; stamina: number; state: string };
+    player: {
+      x: number; y: number; z: number; hp: number; stamina: number; state: string;
+      airborne: boolean; jumpReady: boolean; skillReady: boolean; skillCooldown: number;
+    };
     wolves: Array<{ x: number; z: number; hp: number; state: string; alive: boolean }>;
     locked: boolean;
     run: { kills: number; timeMs: number };
@@ -628,6 +633,10 @@ export class GameEngine {
         hp: Math.round(p.hp),
         stamina: Math.round(p.stamina),
         state: p.state,
+        airborne: p.airborne,
+        jumpReady: p.jumpReady,
+        skillReady: p.skillReady,
+        skillCooldown: +p.skillCooldownRemaining.toFixed(2),
       },
       wolves: this.wolves.map((w) => ({
         x: +w.position.x.toFixed(2),
@@ -705,6 +714,11 @@ export class GameEngine {
       }
     }
     if (input.dodge) this.player.tryDodge(this.moveDirectionWorld(input));
+    if (input.jump && this.player.tryJump()) {
+      this.audio.play('dodge', 0.58);
+      this.fx.kickUpDust(this.player.position, 0.55);
+    }
+    if (input.skill) this.useRuneBurst();
     if (input.lock) this.cycleLock();
 
     this.player.update(simDt, input, this.rig.yaw, this.obstacles, WORLD.arenaRadius);
@@ -793,6 +807,52 @@ export class GameEngine {
     }
   }
 
+  private useRuneBurst(): void {
+    if (!this.player.trySkill()) return;
+    const centre = this.player.position.clone();
+    centre.y += 0.42;
+    for (let i = 0; i < 4; i += 1) {
+      this.fx.slash(centre, this.player.yaw + i * Math.PI * 0.5, PLAYER.skillRadius * 0.72, 0.52, true);
+    }
+    this.fx.hitSpark(centre, 0.9);
+    this.rig.shake(0.52, 0.24);
+    this.audio.play('swing3', 1.15);
+
+    let hitCount = 0;
+    for (const wolf of this.aliveWolves()) {
+      const distance = Math.hypot(wolf.position.x - centre.x, wolf.position.z - centre.z);
+      if (distance > PLAYER.skillRadius + wolf.radius) continue;
+      const result = wolf.applyDamage(PLAYER.skillDamage, PLAYER.skillPoise, centre);
+      const point = contactPoint(this.player, wolf);
+      this.fx.hitSpark(point, 1.45);
+      this.floaters.spawn(`${PLAYER.skillDamage}`, point, 'crit');
+      this.hitStop = Math.max(this.hitStop, PLAYER.hitStopStrong * 0.7);
+      this.audio.play(result.killed ? 'kill' : 'hitClang', 1.05);
+      this.registerKill(wolf, result);
+      hitCount += 1;
+    }
+    this.toast(hitCount > 0 ? `Runic burst · ${hitCount} struck` : 'Runic burst');
+  }
+
+  private registerKill(wolf: Wolf, result: { killed: boolean; staggered: boolean }): void {
+    if (!result.killed) return;
+    this.kills += 1;
+    this.runKills += 1;
+    this.hud.set({ kills: this.kills, runKills: this.runKills });
+    if (this.lockTarget === wolf) this.lockTarget = null;
+    for (const w of this.wolves) w.aggression = clamp(this.kills * WOLF.aggressionPerKill, 0, 0.65);
+
+    if (this.kills >= HUNT_TARGET && !this.clearedShown) {
+      this.clearedShown = true;
+      this.audio.play('levelClear');
+      this.setPhase('cleared');
+      this.toast(`${HUNT_TARGET} down — the wood is quiet`);
+      this.cb.onRunEnd?.({ kills: this.kills, timeMs: Math.round(this.timeMs), died: false });
+    } else {
+      this.toast(result.staggered ? 'Wolf broken' : 'Wolf slain');
+    }
+  }
+
   private resolveCombat(): void {
     const contacts = resolveSwing(this.player, this.wolves);
     for (const c of contacts) {
@@ -804,23 +864,7 @@ export class GameEngine {
       this.rig.shake(c.finisher ? 0.7 : 0.32, c.finisher ? 0.3 : 0.18);
       this.audio.play(result.killed ? 'kill' : result.staggered ? 'hitClang' : 'hitFlesh', c.finisher ? 1.25 : 1);
 
-      if (!result.killed) continue;
-
-      this.kills += 1;
-      this.runKills += 1;
-      this.hud.set({ kills: this.kills, runKills: this.runKills });
-      if (this.lockTarget === c.wolf) this.lockTarget = null;
-      for (const w of this.wolves) w.aggression = clamp(this.kills * WOLF.aggressionPerKill, 0, 0.65);
-
-      if (this.kills >= HUNT_TARGET && !this.clearedShown) {
-        this.clearedShown = true;
-        this.audio.play('levelClear');
-        this.setPhase('cleared');
-        this.toast(`${HUNT_TARGET} down — the wood is quiet`);
-        this.cb.onRunEnd?.({ kills: this.kills, timeMs: Math.round(this.timeMs), died: false });
-      } else {
-        this.toast(result.staggered ? 'Wolf broken' : 'Wolf slain');
-      }
+      this.registerKill(c.wolf, result);
     }
 
     for (const wolf of this.aliveWolves()) {
@@ -967,6 +1011,9 @@ export class GameEngine {
       targetMaxHp: WOLF.maxHp,
       targetVisible: target !== null,
       dodgeReady: this.player.dodgeReady,
+      jumpReady: this.player.jumpReady,
+      skillReady: this.player.skillReady,
+      skillCooldown: this.player.skillCooldownRemaining,
       staminaLocked: this.player.stamina < PLAYER.dodgeStaminaMin,
       fps: Math.round(this.fpsAvg),
       msPerFrame: Math.round(rawDeltaMs * 10) / 10,

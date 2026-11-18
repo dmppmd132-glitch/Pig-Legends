@@ -49,6 +49,14 @@ export const PLAYER = {
   staminaDodgeCost: 24,
   /** Must stay above this to start a dodge; prevents 0-stamina panic rolls. */
   dodgeStaminaMin: 14,
+  jumpSpeed: 7.1,
+  jumpGravity: 19,
+  jumpEvadeHeight: 0.62,
+  skillStaminaCost: 28,
+  skillCooldown: 7.5,
+  skillRadius: 4.2,
+  skillDamage: 24,
+  skillPoise: 30,
 
   dodgeDuration: 0.46,
   dodgeInvulnFrom: 0.06,

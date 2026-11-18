@@ -39,6 +39,8 @@ export class CameraRig {
     run: false,
     attack: false,
     dodge: false,
+    jump: false,
+    skill: false,
     lock: false,
     pause: false,
     restart: false,

@@ -69,10 +69,10 @@ export function resolveBite(wolf: Wolf, player: PigKnight): number | null {
   const dz = player.position.z - bite.from.z;
   const dist = Math.hypot(dx, dz);
   if (dist > WOLF_BITE_RANGE + PLAYER.radius) return null;
-  // The bite is committed either way, so a dodge that happens a frame early
-  // still costs the wolf its window instead of leaving it dangling.
+  // A committed bite is consumed even if ARNO dodges or is high enough in
+  // the jump arc to clear the muzzle; it must not hang around for a later hit.
   wolf.markBiteResolved();
-  if (player.invulnerable) return null;
+  if (player.invulnerable || player.airborne) return null;
   return bite.damage;
 }
 

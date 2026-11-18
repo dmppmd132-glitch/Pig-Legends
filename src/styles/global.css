@@ -365,6 +365,16 @@ body {
   opacity: 0.5;
   transition: opacity 0.2s ease;
   z-index: 3;
+  isolation: isolate;
+}
+
+.joystick::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 50%;
+  pointer-events: auto;
+  z-index: 0;
 }
 
 .joystick.active {
@@ -379,6 +389,13 @@ body {
   border: 1px solid rgba(230, 220, 195, 0.3);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.16);
   transform: translate3d(0, 0, 0);
+  position: relative;
+  z-index: 1;
+  will-change: transform;
+}
+
+.joystick:not(.active) .knob {
+  transition: transform 180ms cubic-bezier(0.2, 1.5, 0.5, 1);
 }
 
 .joystick .ring {
@@ -411,9 +428,12 @@ body {
   bottom: calc(24px + var(--hud-pad-b));
   display: grid;
   grid-template-areas:
-    'run lock'
-    'dodge atk';
-  gap: 12px;
+    'run lock jump'
+    'skill dodge atk';
+  grid-template-columns: repeat(3, var(--act-size, var(--btn-size, 66px)));
+  align-items: center;
+  justify-items: center;
+  gap: 8px;
   z-index: 3;
 }
 
@@ -435,11 +455,14 @@ body {
   transition: transform 0.08s ease, filter 0.08s ease;
   padding: 0;
   appearance: none;
+  position: relative;
+  cursor: pointer;
 }
 
 .act svg {
   width: 44%;
   height: 44%;
+  transform: translateY(-3px);
   stroke: currentColor;
   fill: none;
   stroke-width: 1.6;
@@ -456,14 +479,30 @@ body {
   grid-area: atk;
   color: var(--brass-lit);
   border-color: rgba(232, 199, 106, 0.42);
-  width: calc(var(--btn-size, 66px) * 1.16);
-  height: calc(var(--btn-size, 66px) * 1.16);
+  width: calc(var(--btn-size, 66px) * 1.1);
+  height: calc(var(--btn-size, 66px) * 1.1);
 }
 
 .act.dodge {
   grid-area: dodge;
   color: var(--frost);
   border-color: rgba(143, 196, 216, 0.36);
+}
+
+.act.jump {
+  grid-area: jump;
+  color: var(--frost);
+  border-color: rgba(143, 196, 216, 0.32);
+  width: calc(var(--btn-size, 66px) * 0.86);
+  height: calc(var(--btn-size, 66px) * 0.86);
+}
+
+.act.skill {
+  grid-area: skill;
+  color: var(--witch);
+  border-color: rgba(121, 230, 160, 0.42);
+  width: calc(var(--btn-size, 66px) * 0.92);
+  height: calc(var(--btn-size, 66px) * 0.92);
 }
 
 .act.lock {
@@ -478,6 +517,18 @@ body {
   color: var(--bone-dim);
   width: calc(var(--btn-size, 66px) * 0.72);
   height: calc(var(--btn-size, 66px) * 0.72);
+}
+
+.act-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5px;
+  font: 700 7px/1 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: currentColor;
+  pointer-events: none;
 }
 
 .act.run.on {
@@ -866,6 +917,31 @@ kbd {
 
   .target {
     bottom: calc(92px + var(--hud-pad-b));
+  }
+
+  .actions {
+    --act-size: min(var(--btn-size, 66px), 54px);
+    gap: 7px;
+  }
+
+  .actions .act {
+    --btn-size: var(--act-size);
+  }
+}
+
+@media (max-width: 360px) {
+  .joystick {
+    width: min(var(--joy-size, 132px), 116px);
+    height: min(var(--joy-size, 132px), 116px);
+  }
+
+  .run-flag {
+    bottom: calc(26px + var(--hud-pad-b) + min(var(--joy-size, 132px), 116px) + 6px);
+  }
+
+  .actions {
+    --act-size: min(var(--btn-size, 66px), 42px);
+    gap: 5px;
   }
 }
 
