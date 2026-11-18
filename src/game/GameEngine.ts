@@ -379,7 +379,12 @@ export class GameEngine {
   // ------------------------------------------------------------------
 
   private spawnWolf(first = false): void {
-    const angle = first ? Math.PI : this.rng.range(0, Math.PI * 2);
+    // Yaw 0 (ARNO's starting facing) points down +Z, and the camera sits
+    // behind him at -Z. Putting the first wolf at angle π spawned it directly
+    // behind both the knight and the lens: the player could see neither the
+    // approach nor the target, and every initial sword swing was aimed into
+    // empty space. Start the first encounter in front, inside the camera frustum.
+    const angle = first ? 0 : this.rng.range(0, Math.PI * 2);
     const dist = first ? 13 : this.rng.range(17, WORLD.arenaRadius - 4);
     const x = Math.sin(angle) * dist;
     const z = Math.cos(angle) * dist;
@@ -689,8 +694,15 @@ export class GameEngine {
     }
     if (input.restart && (this.player.state === 'dead' || this.paused)) this.restart();
 
-    if (input.attack && !this.player.tryAttack()) {
-      if (this.player.stamina < PLAYER.staminaAttackCost) this.audio.play('miss');
+    if (input.attack) {
+      // Soft attack aim: a nearby wolf is the intended target, not the patch
+      // of ground ARNO happened to be facing while running. Snap only the
+      // attack's facing (and only when a wolf is already in sword range plus
+      // a small forgiveness margin); free exploration never turns the player.
+      this.faceNearestSwordTarget();
+      if (!this.player.tryAttack() && this.player.stamina < PLAYER.staminaAttackCost) {
+        this.audio.play('miss');
+      }
     }
     if (input.dodge) this.player.tryDodge(this.moveDirectionWorld(input));
     if (input.lock) this.cycleLock();
@@ -719,6 +731,36 @@ export class GameEngine {
     const z = fwdX * input.move.x + fwdZ * input.move.y;
     const len = Math.hypot(x, z);
     return len > 0.001 ? { x: x / len, z: z / len } : { x: 0, z: 0 };
+  }
+
+  /** Face the closest wolf when a swing starts so small aim errors do not make it whiff. */
+  private faceNearestSwordTarget(): void {
+    const maxReach = Math.max(...PLAYER.combo.map((step) => step.reach)) + WOLF.radius + 1.1;
+    let best: Wolf | null = null;
+    let bestDistance = maxReach;
+
+    // If lock-on is engaged, honour it first when the target is in range.
+    const locked = this.lockTarget;
+    if (locked?.alive) {
+      const d = Math.hypot(locked.position.x - this.player.position.x, locked.position.z - this.player.position.z);
+      if (d <= bestDistance) {
+        best = locked;
+        bestDistance = d;
+      }
+    }
+
+    for (const wolf of this.wolves) {
+      if (!wolf.alive || wolf === best) continue;
+      const d = Math.hypot(wolf.position.x - this.player.position.x, wolf.position.z - this.player.position.z);
+      if (d < bestDistance) {
+        best = wolf;
+        bestDistance = d;
+      }
+    }
+
+    if (best) {
+      this.player.yaw = Math.atan2(best.position.x - this.player.position.x, best.position.z - this.player.position.z);
+    }
   }
 
   private updateWolves(dt: number): void {

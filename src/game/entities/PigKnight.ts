@@ -387,7 +387,11 @@ export class PigKnight {
     return {
       centre: this.position.clone(),
       facing: this.yaw,
-      arcDeg: step.arc * 0.6,
+      // `step.arc` is already authored as a full sector angle in config
+      // (118–150°). Multiplying by 0.6 silently narrowed the first swing to
+      // about 71° total, making ordinary facing error feel like every attack
+      // missed. Combat resolution converts the full sector to its half-angle.
+      arcDeg: step.arc,
       reach: step.reach,
           damage: step.damage,
           poise: step.poise,
